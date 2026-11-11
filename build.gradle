@@ -9,7 +9,7 @@ description = 'homework'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(7)
+        languageVersion = JavaLanguageVersion.of(8)
     }
 }
 
