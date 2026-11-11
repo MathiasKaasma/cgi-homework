@@ -1,5 +1,3 @@
-drop table if exists ntf_tx;
-
 create table ntf_tx (
     id bigint primary key,
     tp varchar(32) not null,
