@@ -1,15 +1,19 @@
 package com.example.homework.notification;
 
+import java.net.URI;
 import java.util.List;
 
-import org.springframework.stereotype.Controller;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 
-@Controller
-@RequestMapping("/api/legacy/notifications")
+@RestController
+@RequestMapping("/api/notifications")
 public class NotificationController {
 
   private final NotificationService service;
@@ -18,21 +22,21 @@ public class NotificationController {
     this.service = service;
   }
 
-  @RequestMapping(value = "/send", method = RequestMethod.POST)
-  @ResponseBody
-  public NotificationResponse send(@RequestBody SendNotificationRequest request) {
-    return service.processNotification(request.type(), request.recipient(), request.message());
+  @PostMapping
+  public ResponseEntity<NotificationResponse> send(@Valid @RequestBody SendNotificationRequest request) {
+    NotificationResponse response = service.send(request.type(), request.recipient(), request.message());
+    return ResponseEntity
+        .created(URI.create("/api/notifications/" + response.id()))
+        .body(response);
   }
 
-  @RequestMapping(value = "/history", method = RequestMethod.GET)
-  @ResponseBody
-  public List<NotificationResponse> history() {
-    return service.getHistory();
+  @GetMapping
+  public List<NotificationResponse> getNotifications() {
+    return service.getNotifications();
   }
 
-  @RequestMapping(value = "/latest", method = RequestMethod.GET)
-  @ResponseBody
-  public NotificationResponse latest() {
-    return service.getLatestState();
+  @GetMapping("/{id}")
+  public NotificationResponse getNotification(@PathVariable long id) {
+    return service.getNotification(id);
   }
 }

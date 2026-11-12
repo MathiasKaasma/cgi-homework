@@ -40,24 +40,25 @@ class NotificationServiceIntegrationTest {
       "PUSH,  device-token-abc123"
   })
   void supportedTypeSuccessIsStoredAsSent(NotificationType type, String recipient) {
-    NotificationResponse response = service.processNotification(type, recipient, "hello");
+    NotificationResponse response = service.send(type, recipient, "hello");
 
     assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
     assertThat(response.type()).isEqualTo(type);
-    assertThat(service.getHistory()).hasSize(1);
+    assertThat(response.detail()).isNull();
+    assertThat(service.getNotifications()).hasSize(1);
   }
 
   @Test
   void fourthAttemptToSameRecipientWithinAMinuteIsRateLimited() {
     for (int i = 0; i < 3; i++) {
-      service.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello");
+      service.send(NotificationType.EMAIL, "busy-user@example.com", "hello");
     }
 
-    assertThatThrownBy(() -> service.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello"))
+    assertThatThrownBy(() -> service.send(NotificationType.EMAIL, "busy-user@example.com", "hello"))
         .isInstanceOf(RateLimitExceededException.class);
-    assertThat(service.getLatestState().status()).isEqualTo(NotificationStatus.REJECTED);
+    assertThat(service.getNotifications().getFirst().status()).isEqualTo(NotificationStatus.REJECTED);
 
-    NotificationResponse otherRecipient = service.processNotification(NotificationType.EMAIL, "other-user@example.com", "hello");
+    NotificationResponse otherRecipient = service.send(NotificationType.EMAIL, "other-user@example.com", "hello");
     assertThat(otherRecipient.status()).isEqualTo(NotificationStatus.SENT);
   }
 
@@ -65,24 +66,24 @@ class NotificationServiceIntegrationTest {
   void rejectedAttemptsDoNotCountTowardsRateLimit() {
     failEmailThreeTimes();
     for (int i = 0; i < 3; i++) {
-      assertThatThrownBy(() -> service.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello"))
+      assertThatThrownBy(() -> service.send(NotificationType.EMAIL, "busy-user@example.com", "hello"))
           .isInstanceOf(CircuitOpenException.class);
     }
 
     doCallRealMethod().when(emailSender).send(any(), any());
     doReturn(Instant.now().plusSeconds(31)).when(clock).instant();
 
-    NotificationResponse response = service.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello");
+    NotificationResponse response = service.send(NotificationType.EMAIL, "busy-user@example.com", "hello");
     assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
   }
 
   @Test
   void blacklistedRecipientIsRejectedAndStored() {
-    assertThatThrownBy(() -> service.processNotification(NotificationType.EMAIL, "blocked-user@example.com", "hello"))
+    assertThatThrownBy(() -> service.send(NotificationType.EMAIL, "blocked-user@example.com", "hello"))
         .isInstanceOf(RecipientBlacklistedException.class)
         .hasMessage("Recipient 'blocked-user@example.com' is blacklisted");
 
-    NotificationResponse latest = service.getLatestState();
+    NotificationResponse latest = service.getNotifications().getFirst();
     assertThat(latest.status()).isEqualTo(NotificationStatus.REJECTED);
     assertThat(latest.detail()).isEqualTo("Recipient 'blocked-user@example.com' is blacklisted");
   }
@@ -91,11 +92,11 @@ class NotificationServiceIntegrationTest {
   void threeFailuresOpenCircuitOnlyForThatChannel() {
     failEmailThreeTimes();
 
-    assertThatThrownBy(() -> service.processNotification(NotificationType.EMAIL, "next@example.com", "hello"))
+    assertThatThrownBy(() -> service.send(NotificationType.EMAIL, "next@example.com", "hello"))
         .isInstanceOf(CircuitOpenException.class);
-    assertThat(service.getLatestState().status()).isEqualTo(NotificationStatus.REJECTED);
+    assertThat(service.getNotifications().getFirst().status()).isEqualTo(NotificationStatus.REJECTED);
 
-    NotificationResponse sms = service.processNotification(NotificationType.SMS, "+37255500000", "hello");
+    NotificationResponse sms = service.send(NotificationType.SMS, "+37255500000", "hello");
     assertThat(sms.status()).isEqualTo(NotificationStatus.SENT);
   }
 
@@ -105,7 +106,7 @@ class NotificationServiceIntegrationTest {
     doCallRealMethod().when(emailSender).send(any(), any());
     doReturn(Instant.now().plusSeconds(31)).when(clock).instant();
 
-    NotificationResponse response = service.processNotification(NotificationType.EMAIL, "later@example.com", "hello");
+    NotificationResponse response = service.send(NotificationType.EMAIL, "later@example.com", "hello");
 
     assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
   }
@@ -115,9 +116,9 @@ class NotificationServiceIntegrationTest {
 
     for (int i = 0; i < 3; i++) {
       String recipient = "user" + i + "@example.com";
-      assertThatThrownBy(() -> service.processNotification(NotificationType.EMAIL, recipient, "boom"))
-          .isInstanceOf(RuntimeException.class)
-          .hasMessage("SMTP Timeout");
+      assertThatThrownBy(() -> service.send(NotificationType.EMAIL, recipient, "boom"))
+          .isInstanceOf(ChannelDeliveryException.class)
+          .hasMessage("EMAIL delivery failed: SMTP Timeout");
     }
   }
 
@@ -128,9 +129,9 @@ class NotificationServiceIntegrationTest {
       "PUSH,  "
   })
   void invalidRecipientIsRejectedAndNotStored(NotificationType type, String recipient) {
-    assertThatThrownBy(() -> service.processNotification(type, recipient, "hello"))
+    assertThatThrownBy(() -> service.send(type, recipient, "hello"))
         .isInstanceOf(InvalidRecipientException.class);
 
-    assertThat(service.getHistory()).isEmpty();
+    assertThat(service.getNotifications()).isEmpty();
   }
 }

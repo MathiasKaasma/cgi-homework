@@ -36,7 +36,7 @@ public class NotificationService {
         .collect(Collectors.toMap(NotificationSender::type, Function.identity()));
   }
 
-  public NotificationResponse processNotification(NotificationType type, String rawRecipient, String rawMessage) {
+  public NotificationResponse send(NotificationType type, String rawRecipient, String rawMessage) {
     Instant now = clock.instant();
     String recipient = rawRecipient == null ? "" : rawRecipient.trim();
     String message = rawMessage == null ? "" : rawMessage;
@@ -64,20 +64,20 @@ public class NotificationService {
     } catch (RuntimeException e) {
       notification.markFailed(e.getMessage(), clock.instant());
       repository.save(notification);
-      throw e;
+      throw new ChannelDeliveryException(type, e);
     }
   }
 
-  public List<NotificationResponse> getHistory() {
+  public List<NotificationResponse> getNotifications() {
     return repository.findTop20ByOrderByIdDesc().stream()
         .map(NotificationResponse::from)
         .toList();
   }
 
-  public NotificationResponse getLatestState() {
-    return repository.findTopByOrderByIdDesc()
+  public NotificationResponse getNotification(long id) {
+    return repository.findById(id)
         .map(NotificationResponse::from)
-        .orElse(null);
+        .orElseThrow(() -> new NotificationNotFoundException(id));
   }
 
   private Optional<RuntimeException> checkSafeguards(NotificationType type, String recipient, Instant now) {

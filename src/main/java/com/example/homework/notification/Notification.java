@@ -46,14 +46,13 @@ public class Notification {
     this.recipient = recipient;
     this.message = message;
     this.status = NotificationStatus.PENDING;
-    this.detail = "START";
     this.createdAt = now;
     this.updatedAt = this.createdAt;
   }
 
   public void markSent(Instant now) {
     this.status = NotificationStatus.SENT;
-    this.detail = "SENT";
+    this.detail = null;
     this.updatedAt = now;
   }
 
