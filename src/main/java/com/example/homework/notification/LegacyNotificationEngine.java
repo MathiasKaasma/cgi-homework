@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -47,19 +48,17 @@ public class LegacyNotificationEngine {
       throw new InvalidRecipientException(type, safeTarget);
     }
 
-    if (isUserBlacklistedOrRateLimited(safeTarget, now)) {
-      throw new RuntimeException("Business Rule Violation: User is blacklisted or rate-limited by DB policy.");
-    }
-
     int dispatchCount = repository.findMaxDispatchCount() + 1;
-    Notification notification = repository.save(
-        new Notification(type, safeTarget, safePayload, dispatchCount, now));
+    Notification notification = new Notification(type, safeTarget, safePayload, dispatchCount, now);
 
-    if (isCircuitOpen(type, now)) {
-      notification.markRejected("Circuit breaker OPEN via database state.", now);
+    Optional<RuntimeException> rejection = checkSafeguards(type, safeTarget, now);
+    if (rejection.isPresent()) {
+      notification.markRejected(rejection.get().getMessage(), now);
       repository.save(notification);
-      throw new RuntimeException("Circuit breaker OPEN via database state.");
+      throw rejection.get();
     }
+
+    repository.save(notification);
 
     try {
       sender.send(safeTarget, safePayload);
@@ -84,14 +83,27 @@ public class LegacyNotificationEngine {
         .orElse(null);
   }
 
-  private boolean isUserBlacklistedOrRateLimited(String target, Instant now) {
-    if (target.toLowerCase().contains("blocked")) {
-      return true;
+  private Optional<RuntimeException> checkSafeguards(NotificationType type, String recipient, Instant now) {
+    if (isBlacklisted(recipient)) {
+      return Optional.of(new RecipientBlacklistedException(recipient));
     }
+    if (isRateLimited(recipient, now)) {
+      return Optional.of(new RateLimitExceededException(recipient, RATE_LIMIT, RATE_LIMIT_WINDOW));
+    }
+    if (isCircuitOpen(type, now)) {
+      return Optional.of(new CircuitOpenException(type));
+    }
+    return Optional.empty();
+  }
 
-    long recentCount = repository.countByRecipientAndCreatedAtGreaterThanEqual(target, now.minus(RATE_LIMIT_WINDOW));
+  private boolean isBlacklisted(String recipient) {
+    return recipient.toLowerCase().contains("blocked");
+  }
 
-    return recentCount >= RATE_LIMIT;
+  private boolean isRateLimited(String recipient, Instant now) {
+    long recentAttempts = repository.countByRecipientAndStatusInAndCreatedAtGreaterThanEqual(
+        recipient, ATTEMPT_STATUSES, now.minus(RATE_LIMIT_WINDOW));
+    return recentAttempts >= RATE_LIMIT;
   }
 
   private boolean isCircuitOpen(NotificationType type, Instant now) {

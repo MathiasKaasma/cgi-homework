@@ -54,20 +54,37 @@ class LegacyNotificationEngineIntegrationTest {
     }
 
     assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello"))
-        .isInstanceOf(RuntimeException.class)
-        .hasMessage("Business Rule Violation: User is blacklisted or rate-limited by DB policy.");
+        .isInstanceOf(RateLimitExceededException.class);
+    assertThat(engine.getLatestState().status()).isEqualTo(NotificationStatus.REJECTED);
 
     LegacyNotificationResponse otherRecipient = engine.processNotification(NotificationType.EMAIL, "other-user@example.com", "hello");
     assertThat(otherRecipient.status()).isEqualTo(NotificationStatus.SENT);
   }
 
   @Test
-  void blockedTargetFailsBeforeDispatchIsInserted() {
-    assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "blocked-user@example.com", "hello"))
-        .isInstanceOf(RuntimeException.class)
-        .hasMessage("Business Rule Violation: User is blacklisted or rate-limited by DB policy.");
+  void rejectedAttemptsDoNotCountTowardsRateLimit() throws Exception {
+    failEmailThreeTimes();
+    for (int i = 0; i < 3; i++) {
+      assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello"))
+          .isInstanceOf(CircuitOpenException.class);
+    }
 
-    assertThat(engine.getHistory()).isEmpty();
+    doCallRealMethod().when(emailSender).send(any(), any());
+    doReturn(Instant.now().plusSeconds(31)).when(clock).instant();
+
+    LegacyNotificationResponse response = engine.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello");
+    assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
+  }
+
+  @Test
+  void blacklistedRecipientIsRejectedAndStored() {
+    assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "blocked-user@example.com", "hello"))
+        .isInstanceOf(RecipientBlacklistedException.class)
+        .hasMessage("Recipient 'blocked-user@example.com' is blacklisted");
+
+    LegacyNotificationResponse latest = engine.getLatestState();
+    assertThat(latest.status()).isEqualTo(NotificationStatus.REJECTED);
+    assertThat(latest.message()).isEqualTo("Recipient 'blocked-user@example.com' is blacklisted");
   }
 
   @Test
@@ -75,8 +92,7 @@ class LegacyNotificationEngineIntegrationTest {
     failEmailThreeTimes();
 
     assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "next@example.com", "hello"))
-        .isInstanceOf(RuntimeException.class)
-        .hasMessage("Circuit breaker OPEN via database state.");
+        .isInstanceOf(CircuitOpenException.class);
     assertThat(engine.getLatestState().status()).isEqualTo(NotificationStatus.REJECTED);
 
     LegacyNotificationResponse sms = engine.processNotification(NotificationType.SMS, "+37255500000", "hello");

@@ -14,7 +14,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
   Optional<Notification> findTopByOrderByIdDesc();
 
-  long countByRecipientAndCreatedAtGreaterThanEqual(String recipient, Instant since);
+  long countByRecipientAndStatusInAndCreatedAtGreaterThanEqual(
+      String recipient, Collection<NotificationStatus> statuses, Instant since);
 
   @Query("select coalesce(max(n.dispatchCount), 0) from Notification n")
   int findMaxDispatchCount();
