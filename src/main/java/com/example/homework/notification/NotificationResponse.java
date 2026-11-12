@@ -2,7 +2,7 @@ package com.example.homework.notification;
 
 import java.time.Instant;
 
-public record LegacyNotificationResponse(
+public record NotificationResponse(
     long id,
     NotificationType type,
     String recipient,
@@ -12,8 +12,8 @@ public record LegacyNotificationResponse(
     Instant createdAt,
     Instant updatedAt) {
 
-  public static LegacyNotificationResponse from(Notification notification) {
-    return new LegacyNotificationResponse(
+  public static NotificationResponse from(Notification notification) {
+    return new NotificationResponse(
         notification.getId(),
         notification.getType(),
         notification.getRecipient(),

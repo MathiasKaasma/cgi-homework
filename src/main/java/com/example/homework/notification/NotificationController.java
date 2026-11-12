@@ -10,29 +10,29 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
 @RequestMapping("/api/legacy/notifications")
-public class LegacyNotificationController {
+public class NotificationController {
 
-  private final LegacyNotificationEngine engine;
+  private final NotificationService service;
 
-  public LegacyNotificationController(LegacyNotificationEngine engine) {
-    this.engine = engine;
+  public NotificationController(NotificationService service) {
+    this.service = service;
   }
 
   @RequestMapping(value = "/send", method = RequestMethod.POST)
   @ResponseBody
-  public LegacyNotificationResponse send(@RequestBody LegacyNotificationRequest request) {
-    return engine.processNotification(request.type(), request.recipient(), request.message());
+  public NotificationResponse send(@RequestBody SendNotificationRequest request) {
+    return service.processNotification(request.type(), request.recipient(), request.message());
   }
 
   @RequestMapping(value = "/history", method = RequestMethod.GET)
   @ResponseBody
-  public List<LegacyNotificationResponse> history() {
-    return engine.getHistory();
+  public List<NotificationResponse> history() {
+    return service.getHistory();
   }
 
   @RequestMapping(value = "/latest", method = RequestMethod.GET)
   @ResponseBody
-  public LegacyNotificationResponse latest() {
-    return engine.getLatestState();
+  public NotificationResponse latest() {
+    return service.getLatestState();
   }
 }

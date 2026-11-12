@@ -13,7 +13,7 @@ import com.example.homework.notification.sender.NotificationSender;
 import org.springframework.stereotype.Service;
 
 @Service
-public class LegacyNotificationEngine {
+public class NotificationService {
 
   private static final int RATE_LIMIT = 3;
   private static final Duration RATE_LIMIT_WINDOW = Duration.ofMinutes(1);
@@ -28,7 +28,7 @@ public class LegacyNotificationEngine {
 
   private final Clock clock;
 
-  public LegacyNotificationEngine(NotificationRepository repository, List<NotificationSender> senders, Clock clock) {
+  public NotificationService(NotificationRepository repository, List<NotificationSender> senders, Clock clock) {
     this.repository = repository;
     this.clock = clock;
 
@@ -36,7 +36,7 @@ public class LegacyNotificationEngine {
         .collect(Collectors.toMap(NotificationSender::type, Function.identity()));
   }
 
-  public LegacyNotificationResponse processNotification(NotificationType type, String rawRecipient, String rawMessage) {
+  public NotificationResponse processNotification(NotificationType type, String rawRecipient, String rawMessage) {
     Instant now = clock.instant();
     String recipient = rawRecipient == null ? "" : rawRecipient.trim();
     String message = rawMessage == null ? "" : rawMessage;
@@ -60,7 +60,7 @@ public class LegacyNotificationEngine {
     try {
       sender.send(recipient, message);
       notification.markSent(clock.instant());
-      return LegacyNotificationResponse.from(repository.save(notification));
+      return NotificationResponse.from(repository.save(notification));
     } catch (RuntimeException e) {
       notification.markFailed(e.getMessage(), clock.instant());
       repository.save(notification);
@@ -68,15 +68,15 @@ public class LegacyNotificationEngine {
     }
   }
 
-  public List<LegacyNotificationResponse> getHistory() {
+  public List<NotificationResponse> getHistory() {
     return repository.findTop20ByOrderByIdDesc().stream()
-        .map(LegacyNotificationResponse::from)
+        .map(NotificationResponse::from)
         .toList();
   }
 
-  public LegacyNotificationResponse getLatestState() {
+  public NotificationResponse getLatestState() {
     return repository.findTopByOrderByIdDesc()
-        .map(LegacyNotificationResponse::from)
+        .map(NotificationResponse::from)
         .orElse(null);
   }
 

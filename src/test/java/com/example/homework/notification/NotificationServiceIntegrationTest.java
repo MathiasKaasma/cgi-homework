@@ -22,10 +22,10 @@ import com.example.homework.notification.sender.EmailSender;
 
 @SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-class LegacyNotificationEngineIntegrationTest {
+class NotificationServiceIntegrationTest {
 
   @Autowired
-  private LegacyNotificationEngine engine;
+  private NotificationService service;
 
   @MockitoSpyBean
   private EmailSender emailSender;
@@ -40,24 +40,24 @@ class LegacyNotificationEngineIntegrationTest {
       "PUSH,  device-token-abc123"
   })
   void supportedTypeSuccessIsStoredAsSent(NotificationType type, String recipient) {
-    LegacyNotificationResponse response = engine.processNotification(type, recipient, "hello");
+    NotificationResponse response = service.processNotification(type, recipient, "hello");
 
     assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
     assertThat(response.type()).isEqualTo(type);
-    assertThat(engine.getHistory()).hasSize(1);
+    assertThat(service.getHistory()).hasSize(1);
   }
 
   @Test
   void fourthAttemptToSameRecipientWithinAMinuteIsRateLimited() {
     for (int i = 0; i < 3; i++) {
-      engine.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello");
+      service.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello");
     }
 
-    assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello"))
+    assertThatThrownBy(() -> service.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello"))
         .isInstanceOf(RateLimitExceededException.class);
-    assertThat(engine.getLatestState().status()).isEqualTo(NotificationStatus.REJECTED);
+    assertThat(service.getLatestState().status()).isEqualTo(NotificationStatus.REJECTED);
 
-    LegacyNotificationResponse otherRecipient = engine.processNotification(NotificationType.EMAIL, "other-user@example.com", "hello");
+    NotificationResponse otherRecipient = service.processNotification(NotificationType.EMAIL, "other-user@example.com", "hello");
     assertThat(otherRecipient.status()).isEqualTo(NotificationStatus.SENT);
   }
 
@@ -65,24 +65,24 @@ class LegacyNotificationEngineIntegrationTest {
   void rejectedAttemptsDoNotCountTowardsRateLimit() {
     failEmailThreeTimes();
     for (int i = 0; i < 3; i++) {
-      assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello"))
+      assertThatThrownBy(() -> service.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello"))
           .isInstanceOf(CircuitOpenException.class);
     }
 
     doCallRealMethod().when(emailSender).send(any(), any());
     doReturn(Instant.now().plusSeconds(31)).when(clock).instant();
 
-    LegacyNotificationResponse response = engine.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello");
+    NotificationResponse response = service.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello");
     assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
   }
 
   @Test
   void blacklistedRecipientIsRejectedAndStored() {
-    assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "blocked-user@example.com", "hello"))
+    assertThatThrownBy(() -> service.processNotification(NotificationType.EMAIL, "blocked-user@example.com", "hello"))
         .isInstanceOf(RecipientBlacklistedException.class)
         .hasMessage("Recipient 'blocked-user@example.com' is blacklisted");
 
-    LegacyNotificationResponse latest = engine.getLatestState();
+    NotificationResponse latest = service.getLatestState();
     assertThat(latest.status()).isEqualTo(NotificationStatus.REJECTED);
     assertThat(latest.detail()).isEqualTo("Recipient 'blocked-user@example.com' is blacklisted");
   }
@@ -91,11 +91,11 @@ class LegacyNotificationEngineIntegrationTest {
   void threeFailuresOpenCircuitOnlyForThatChannel() {
     failEmailThreeTimes();
 
-    assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "next@example.com", "hello"))
+    assertThatThrownBy(() -> service.processNotification(NotificationType.EMAIL, "next@example.com", "hello"))
         .isInstanceOf(CircuitOpenException.class);
-    assertThat(engine.getLatestState().status()).isEqualTo(NotificationStatus.REJECTED);
+    assertThat(service.getLatestState().status()).isEqualTo(NotificationStatus.REJECTED);
 
-    LegacyNotificationResponse sms = engine.processNotification(NotificationType.SMS, "+37255500000", "hello");
+    NotificationResponse sms = service.processNotification(NotificationType.SMS, "+37255500000", "hello");
     assertThat(sms.status()).isEqualTo(NotificationStatus.SENT);
   }
 
@@ -105,7 +105,7 @@ class LegacyNotificationEngineIntegrationTest {
     doCallRealMethod().when(emailSender).send(any(), any());
     doReturn(Instant.now().plusSeconds(31)).when(clock).instant();
 
-    LegacyNotificationResponse response = engine.processNotification(NotificationType.EMAIL, "later@example.com", "hello");
+    NotificationResponse response = service.processNotification(NotificationType.EMAIL, "later@example.com", "hello");
 
     assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
   }
@@ -115,7 +115,7 @@ class LegacyNotificationEngineIntegrationTest {
 
     for (int i = 0; i < 3; i++) {
       String recipient = "user" + i + "@example.com";
-      assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, recipient, "boom"))
+      assertThatThrownBy(() -> service.processNotification(NotificationType.EMAIL, recipient, "boom"))
           .isInstanceOf(RuntimeException.class)
           .hasMessage("SMTP Timeout");
     }
@@ -128,9 +128,9 @@ class LegacyNotificationEngineIntegrationTest {
       "PUSH,  "
   })
   void invalidRecipientIsRejectedAndNotStored(NotificationType type, String recipient) {
-    assertThatThrownBy(() -> engine.processNotification(type, recipient, "hello"))
+    assertThatThrownBy(() -> service.processNotification(type, recipient, "hello"))
         .isInstanceOf(InvalidRecipientException.class);
 
-    assertThat(engine.getHistory()).isEmpty();
+    assertThat(service.getHistory()).isEmpty();
   }
 }
