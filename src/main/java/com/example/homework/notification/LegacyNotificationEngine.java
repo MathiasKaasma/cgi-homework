@@ -70,25 +70,18 @@ public class LegacyNotificationEngine {
   public static class LegacyDatabaseManager {
 
     private final JdbcTemplate jdbcTemplate;
-    private final RowMapper<LegacyNotificationResponse> rowMapper = new RowMapper<LegacyNotificationResponse>() {
-      @Override
-      public LegacyNotificationResponse mapRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
-        LegacyNotificationResponse response = new LegacyNotificationResponse();
-        response.setId(rs.getLong("id"));
-        response.setType(rs.getString("tp"));
-        response.setTarget(rs.getString("tgt"));
-        response.setPayload(rs.getString("pld"));
-        response.setStatus(rs.getString("st"));
-        response.setFailureCount(rs.getInt("fc"));
-        response.setDispatchCount(rs.getInt("dc"));
-        response.setBlocked("Y".equals(rs.getString("bl")) ? "Y" : "N");
-        response.setMessage(rs.getString("lm"));
-
-        response.setCreatedAt(rs.getTimestamp("crt"));
-        response.setUpdatedAt(rs.getTimestamp("upd"));
-        return response;
-      }
-    };
+    private final RowMapper<LegacyNotificationResponse> rowMapper = (rs, rowNum) -> new LegacyNotificationResponse(
+        rs.getLong("id"),
+        rs.getString("tp"),
+        rs.getString("tgt"),
+        rs.getString("pld"),
+        rs.getString("st"),
+        rs.getInt("fc"),
+        rs.getInt("dc"),
+        "Y".equals(rs.getString("bl")) ? "Y" : "N",
+        rs.getString("lm"),
+        rs.getTimestamp("crt"),
+        rs.getTimestamp("upd"));
 
     public LegacyDatabaseManager(JdbcTemplate jdbcTemplate) {
       this.jdbcTemplate = jdbcTemplate;
