@@ -3,7 +3,12 @@ package com.example.homework.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+
+import java.time.Clock;
+import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -24,6 +29,9 @@ class LegacyNotificationEngineIntegrationTest {
 
   @MockitoSpyBean
   private EmailSender emailSender;
+
+  @MockitoSpyBean
+  private Clock clock;
 
   @ParameterizedTest
   @CsvSource({
@@ -63,23 +71,38 @@ class LegacyNotificationEngineIntegrationTest {
   }
 
   @Test
-  void threeFailuresOpenCircuitBreakerForNextAttempt() {
+  void threeFailuresOpenCircuitOnlyForThatChannel() throws Exception {
+    failEmailThreeTimes();
+
+    assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "next@example.com", "hello"))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("Circuit breaker OPEN via database state.");
+    assertThat(engine.getLatestState().status()).isEqualTo(NotificationStatus.REJECTED);
+
+    LegacyNotificationResponse sms = engine.processNotification(NotificationType.SMS, "+37255500000", "hello");
+    assertThat(sms.status()).isEqualTo(NotificationStatus.SENT);
+  }
+
+  @Test
+  void circuitClosesAfterCooldown() throws Exception {
+    failEmailThreeTimes();
+    doCallRealMethod().when(emailSender).send(any(), any());
+    doReturn(Instant.now().plusSeconds(31)).when(clock).instant();
+
+    LegacyNotificationResponse response = engine.processNotification(NotificationType.EMAIL, "later@example.com", "hello");
+
+    assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
+  }
+
+  private void failEmailThreeTimes() {
     doThrow(new RuntimeException("SMTP Timeout")).when(emailSender).send(any(), any());
 
     for (int i = 0; i < 3; i++) {
-        assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "example-user@example.com", "boom"))
+      String recipient = "user" + i + "@example.com";
+      assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, recipient, "boom"))
           .isInstanceOf(RuntimeException.class)
           .hasMessage("SMTP Timeout");
     }
-
-    assertThatThrownBy(() -> engine.processNotification(NotificationType.SMS, "+37255500000", "hello"))
-        .isInstanceOf(RuntimeException.class)
-        .hasMessage("Circuit breaker OPEN via database state.");
-
-    LegacyNotificationResponse latest = engine.getLatestState();
-    assertThat(latest.status()).isEqualTo(NotificationStatus.REJECTED);
-    assertThat(latest.failureCount()).isEqualTo(3);
-    assertThat(latest.dispatchCount()).isEqualTo(4);
   }
 
   @ParameterizedTest

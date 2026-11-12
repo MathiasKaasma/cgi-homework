@@ -1,6 +1,7 @@
 package com.example.homework.notification;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,4 +18,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
   @Query("select coalesce(max(n.dispatchCount), 0) from Notification n")
   int findMaxDispatchCount();
+
+  List<Notification> findTop3ByTypeAndStatusInOrderByIdDesc(NotificationType type, Collection<NotificationStatus> statuses);
 }

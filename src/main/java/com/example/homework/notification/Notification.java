@@ -32,8 +32,6 @@ public class Notification {
   @Enumerated(EnumType.STRING)
   private NotificationStatus status;
 
-  private int failureCount;
-
   private int dispatchCount;
 
   private String blocked;
@@ -47,37 +45,34 @@ public class Notification {
   protected Notification() {
   }
 
-  public Notification(NotificationType type, String recipient, String message, int failureCount, int dispatchCount) {
+  public Notification(NotificationType type, String recipient, String message, int dispatchCount, Instant now) {
     this.type = type;
     this.recipient = recipient;
     this.message = message;
     this.status = NotificationStatus.PENDING;
-    this.failureCount = failureCount;
     this.dispatchCount = dispatchCount;
     this.blocked = "N";
     this.detail = "START";
-    this.createdAt = Instant.now();
+    this.createdAt = now;
     this.updatedAt = this.createdAt;
   }
 
-  public void markSent() {
+  public void markSent(Instant now) {
     this.status = NotificationStatus.SENT;
-    this.failureCount = 0;
     this.detail = "SENT";
-    this.updatedAt = Instant.now();
+    this.updatedAt = now;
   }
 
-  public void markFailed(String error, int failureCount) {
+  public void markFailed(String error, Instant now) {
     this.status = NotificationStatus.FAILED;
-    this.failureCount = failureCount;
     this.detail = truncate(error);
-    this.updatedAt = Instant.now();
+    this.updatedAt = now;
   }
 
-  public void markRejected(String reason) {
+  public void markRejected(String reason, Instant now) {
     this.status = NotificationStatus.REJECTED;
     this.detail = truncate(reason);
-    this.updatedAt = Instant.now();
+    this.updatedAt = now;
   }
 
   private static String truncate(String value) {
@@ -105,10 +100,6 @@ public class Notification {
 
   public NotificationStatus getStatus() {
     return status;
-  }
-
-  public int getFailureCount() {
-    return failureCount;
   }
 
   public int getDispatchCount() {
