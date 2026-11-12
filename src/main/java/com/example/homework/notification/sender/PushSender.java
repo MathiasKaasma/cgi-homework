@@ -16,4 +16,9 @@ public class PushSender implements NotificationSender {
   public void send(String target, String payload) {
     System.out.println("[PUSH] " + target + " -> " + payload);
   }
+
+  @Override
+  public boolean isValidRecipient(String target) {
+    return !target.isBlank();
+  }
 }

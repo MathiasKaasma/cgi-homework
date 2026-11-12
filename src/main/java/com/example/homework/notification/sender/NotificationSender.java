@@ -7,4 +7,6 @@ public interface NotificationSender {
   NotificationType type();
 
   void send(String target, String payload);
+
+  boolean isValidRecipient(String target);
 }

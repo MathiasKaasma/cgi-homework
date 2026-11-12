@@ -31,9 +31,10 @@ public class LegacyNotificationEngine {
 
     String safeTarget = target != null ? target.trim() : null;
     String safePayload = payload != null ? payload : "";
+    NotificationSender sender = sendersByType.get(type);
 
-    if (safeTarget == null || safeTarget.length() == 0) {
-      throw new IllegalArgumentException("Target is mandatory.");
+    if (safeTarget == null || safeTarget.isEmpty() || !sender.isValidRecipient(safeTarget)) {
+      throw new InvalidRecipientException(type, safeTarget);
     }
 
     if (dbManager.isUserBlacklistedOrRateLimited(safeTarget)) {
@@ -46,8 +47,6 @@ public class LegacyNotificationEngine {
       dbManager.markAsSkipped(id, "Circuit breaker OPEN via database state.");
       throw new RuntimeException("Circuit breaker OPEN via database state.");
     }
-
-    NotificationSender sender = sendersByType.get(type);
 
     try {
       sender.send(safeTarget, safePayload);

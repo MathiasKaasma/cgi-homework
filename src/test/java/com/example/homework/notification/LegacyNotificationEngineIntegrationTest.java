@@ -55,7 +55,7 @@ class LegacyNotificationEngineIntegrationTest {
 
   @Test
   void blockedTargetFailsBeforeDispatchIsInserted() {
-    assertThatThrownBy(() -> engine.processNotification(NotificationType.SMS, "blocked-user@example.com", "hello"))
+    assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "blocked-user@example.com", "hello"))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Business Rule Violation: User is blacklisted or rate-limited by DB policy.");
 
@@ -72,7 +72,7 @@ class LegacyNotificationEngineIntegrationTest {
           .hasMessage("SMTP Timeout");
     }
 
-    assertThatThrownBy(() -> engine.processNotification(NotificationType.SMS, "ok-user@example.com", "hello"))
+    assertThatThrownBy(() -> engine.processNotification(NotificationType.SMS, "+37255500000", "hello"))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Circuit breaker OPEN via database state.");
 
@@ -80,5 +80,18 @@ class LegacyNotificationEngineIntegrationTest {
     assertThat(latest.status()).isEqualTo("R");
     assertThat(latest.failureCount()).isEqualTo(3);
     assertThat(latest.dispatchCount()).isEqualTo(4);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "EMAIL, broken-email@",
+      "SMS,   +5555broken-sms",
+      "PUSH,  "
+  })
+  void invalidTargetThrowsInvalidRecipientException(NotificationType type, String target) {
+    assertThatThrownBy(() -> engine.processNotification(type, target, "hello"))
+        .isInstanceOf(InvalidRecipientException.class);
+
+    assertThat(engine.getHistory()).isEmpty();
   }
 }
