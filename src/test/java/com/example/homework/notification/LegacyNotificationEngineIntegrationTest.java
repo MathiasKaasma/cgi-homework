@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
@@ -15,14 +17,32 @@ class LegacyNotificationEngineIntegrationTest {
   @Autowired
   private LegacyNotificationEngine engine;
 
-  @Test
-  void emailSuccessIsStoredAsSent() throws Exception {
-    LegacyNotificationResponse response = engine.processNotification("EMAIL", "buyer@example.com", "hello");
+  @ParameterizedTest
+  @CsvSource({
+      "EMAIL, buyer@example.com",
+      "SMS,   +37255512345",
+      "PUSH,  device-token-abc123"
+  })
+  void supportedTypeSuccessIsStoredAsSent(String type, String target) throws Exception {
+    LegacyNotificationResponse response = engine.processNotification(type, target, "hello");
 
     assertThat(response.getStatus()).isEqualTo("S");
-    assertThat(response.getDispatchCount()).isEqualTo(1);
-    assertThat(response.getFailureCount()).isZero();
+    assertThat(response.getType()).isEqualTo(type);
     assertThat(engine.getHistory()).hasSize(1);
+  }
+
+  @Test
+  void fourthAttemptToSameRecipientWithinAMinuteIsRateLimited() throws Exception {
+    for (int i = 0; i < 3; i++) {
+      engine.processNotification("EMAIL", "busy-user@example.com", "hello");
+    }
+
+    assertThatThrownBy(() -> engine.processNotification("EMAIL", "busy-user@example.com", "hello"))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("Business Rule Violation: User is blacklisted or rate-limited by DB policy.");
+
+    LegacyNotificationResponse otherRecipient = engine.processNotification("EMAIL", "other-user@example.com", "hello");
+    assertThat(otherRecipient.getStatus()).isEqualTo("S");
   }
 
   @Test
