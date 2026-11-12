@@ -1,13 +1,15 @@
 package com.example.homework.notification.sender;
 
+import com.example.homework.notification.NotificationType;
+
 import org.springframework.stereotype.Component;
 
 @Component
 public class SmsSender implements NotificationSender {
 
   @Override
-  public String type() {
-    return "SMS";
+  public NotificationType type() {
+    return NotificationType.SMS;
   }
 
   @Override

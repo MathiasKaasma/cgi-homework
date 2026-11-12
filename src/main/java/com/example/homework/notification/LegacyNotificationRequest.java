@@ -2,15 +2,15 @@ package com.example.homework.notification;
 
 public class LegacyNotificationRequest {
 
-  private String type;
+  private NotificationType type;
   private String target;
   private String payload;
 
-  public String getType() {
+  public NotificationType getType() {
     return type;
   }
 
-  public void setType(String type) {
+  public void setType(NotificationType type) {
     this.type = type;
   }
 

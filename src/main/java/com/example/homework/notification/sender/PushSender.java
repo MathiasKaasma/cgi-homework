@@ -1,13 +1,15 @@
 package com.example.homework.notification.sender;
 
+import com.example.homework.notification.NotificationType;
+
 import org.springframework.stereotype.Component;
 
 @Component
 public class PushSender implements NotificationSender {
 
   @Override
-  public String type() {
-    return "PUSH";
+  public NotificationType type() {
+    return NotificationType.PUSH;
   }
 
   @Override

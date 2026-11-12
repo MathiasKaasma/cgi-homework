@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class LegacyNotificationEngine {
 
-  private final Map<String, NotificationSender> sendersByType;
+  private final Map<NotificationType, NotificationSender> sendersByType;
 
   private final LegacyDatabaseManager dbManager;
 
@@ -26,10 +26,9 @@ public class LegacyNotificationEngine {
         .collect(Collectors.toMap(NotificationSender::type, Function.identity()));
   }
 
-  public synchronized LegacyNotificationResponse processNotification(String type, String target, String payload)
+  public synchronized LegacyNotificationResponse processNotification(NotificationType type, String target, String payload)
       throws Exception {
 
-    String safeType = type != null ? type.trim().toUpperCase() : "";
     String safeTarget = target != null ? target.trim() : null;
     String safePayload = payload != null ? payload : "";
 
@@ -41,19 +40,14 @@ public class LegacyNotificationEngine {
       throw new RuntimeException("Business Rule Violation: User is blacklisted or rate-limited by DB policy.");
     }
 
-    long id = dbManager.openDispatch(safeType, safeTarget, safePayload);
+    long id = dbManager.openDispatch(type, safeTarget, safePayload);
 
     if (dbManager.getFailureCountFromDatabase() >= 3) {
       dbManager.markAsSkipped(id, "Circuit breaker OPEN via database state.");
       throw new RuntimeException("Circuit breaker OPEN via database state.");
     }
 
-    NotificationSender sender = sendersByType.get(safeType);
-    if (sender == null) {
-      System.out.println("LOGGING TO DB: Unknown type attempted -> " + type);
-      dbManager.recordUnsupportedType(id, safeType);
-      throw new Exception("Unsupported type: " + type);
-    }
+    NotificationSender sender = sendersByType.get(type);
 
     try {
       sender.send(safeTarget, safePayload);
@@ -116,7 +110,7 @@ public class LegacyNotificationEngine {
       return recentCount != null && recentCount.intValue() >= 3;
     }
 
-    public long openDispatch(final String type, final String target, final String payload) {
+    public long openDispatch(final NotificationType type, final String target, final String payload) {
       final long id = getNextId();
       final int nextDispatchCount = getTotalDispatches() + 1;
       final int currentFailureCount = getFailureCountFromDatabase();
@@ -127,7 +121,7 @@ public class LegacyNotificationEngine {
           "insert into ntf_tx(id, tp, tgt, pld, st, fc, dc, bl, lm, crt, upd) "
               + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           Long.valueOf(id),
-          type,
+          type.name(),
           target,
           payload,
           "N",
@@ -192,15 +186,6 @@ public class LegacyNotificationEngine {
           "S",
           Integer.valueOf(0),
           "SENT",
-          new Timestamp(System.currentTimeMillis()),
-          Long.valueOf(id));
-    }
-
-    public void recordUnsupportedType(long id, String type) {
-      jdbcTemplate.update(
-          "update ntf_tx set st = ?, lm = ?, upd = ? where id = ?",
-          "U",
-          shorten("Unsupported type: " + type),
           new Timestamp(System.currentTimeMillis()),
           Long.valueOf(id));
     }
