@@ -1,17 +1,32 @@
 package com.example.homework.notification;
 
-import java.sql.Timestamp;
+import java.time.Instant;
 
 public record LegacyNotificationResponse(
     long id,
-    String type,
+    NotificationType type,
     String target,
     String payload,
-    String status,
+    NotificationStatus status,
     int failureCount,
     int dispatchCount,
     String blocked,
     String message,
-    Timestamp createdAt,
-    Timestamp updatedAt) {
+    Instant createdAt,
+    Instant updatedAt) {
+
+  public static LegacyNotificationResponse from(Notification notification) {
+    return new LegacyNotificationResponse(
+        notification.getId(),
+        notification.getType(),
+        notification.getRecipient(),
+        notification.getMessage(),
+        notification.getStatus(),
+        notification.getFailureCount(),
+        notification.getDispatchCount(),
+        notification.getBlocked(),
+        notification.getDetail(),
+        notification.getCreatedAt(),
+        notification.getUpdatedAt());
+  }
 }

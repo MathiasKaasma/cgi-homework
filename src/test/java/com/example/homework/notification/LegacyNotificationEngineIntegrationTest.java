@@ -34,8 +34,8 @@ class LegacyNotificationEngineIntegrationTest {
   void supportedTypeSuccessIsStoredAsSent(NotificationType type, String target) throws Exception {
     LegacyNotificationResponse response = engine.processNotification(type, target, "hello");
 
-    assertThat(response.status()).isEqualTo("S");
-    assertThat(response.type()).isEqualTo(type.name());
+    assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
+    assertThat(response.type()).isEqualTo(type);
     assertThat(engine.getHistory()).hasSize(1);
   }
 
@@ -50,7 +50,7 @@ class LegacyNotificationEngineIntegrationTest {
         .hasMessage("Business Rule Violation: User is blacklisted or rate-limited by DB policy.");
 
     LegacyNotificationResponse otherRecipient = engine.processNotification(NotificationType.EMAIL, "other-user@example.com", "hello");
-    assertThat(otherRecipient.status()).isEqualTo("S");
+    assertThat(otherRecipient.status()).isEqualTo(NotificationStatus.SENT);
   }
 
   @Test
@@ -77,7 +77,7 @@ class LegacyNotificationEngineIntegrationTest {
         .hasMessage("Circuit breaker OPEN via database state.");
 
     LegacyNotificationResponse latest = engine.getLatestState();
-    assertThat(latest.status()).isEqualTo("R");
+    assertThat(latest.status()).isEqualTo(NotificationStatus.REJECTED);
     assertThat(latest.failureCount()).isEqualTo(3);
     assertThat(latest.dispatchCount()).isEqualTo(4);
   }
