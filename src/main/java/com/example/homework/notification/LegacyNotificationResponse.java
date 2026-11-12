@@ -5,12 +5,10 @@ import java.time.Instant;
 public record LegacyNotificationResponse(
     long id,
     NotificationType type,
-    String target,
-    String payload,
-    NotificationStatus status,
-    int dispatchCount,
-    String blocked,
+    String recipient,
     String message,
+    NotificationStatus status,
+    String detail,
     Instant createdAt,
     Instant updatedAt) {
 
@@ -21,8 +19,6 @@ public record LegacyNotificationResponse(
         notification.getRecipient(),
         notification.getMessage(),
         notification.getStatus(),
-        notification.getDispatchCount(),
-        notification.getBlocked(),
         notification.getDetail(),
         notification.getCreatedAt(),
         notification.getUpdatedAt());

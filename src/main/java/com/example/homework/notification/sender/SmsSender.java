@@ -17,12 +17,12 @@ public class SmsSender implements NotificationSender {
   }
 
   @Override
-  public void send(String target, String payload) {
-    System.out.println("[SMS] " + target + " -> " + payload);
+  public void send(String recipient, String message) {
+    System.out.println("[SMS] " + recipient + " -> " + message);
   }
 
   @Override
-  public boolean isValidRecipient(String target) {
-    return PHONE.matcher(target).matches();
+  public boolean isValidRecipient(String recipient) {
+    return PHONE.matcher(recipient).matches();
   }
 }

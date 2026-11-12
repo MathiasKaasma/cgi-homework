@@ -17,12 +17,12 @@ public class EmailSender implements NotificationSender {
   }
 
   @Override
-  public void send(String target, String payload) {
-    System.out.println("[EMAIL] " + target + " -> " + payload);
+  public void send(String recipient, String message) {
+    System.out.println("[EMAIL] " + recipient + " -> " + message);
   }
 
   @Override
-  public boolean isValidRecipient(String target) {
-    return EMAIL.matcher(target).matches();
+  public boolean isValidRecipient(String recipient) {
+    return EMAIL.matcher(recipient).matches();
   }
 }

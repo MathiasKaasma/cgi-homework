@@ -32,10 +32,6 @@ public class Notification {
   @Enumerated(EnumType.STRING)
   private NotificationStatus status;
 
-  private int dispatchCount;
-
-  private String blocked;
-
   private String detail;
 
   private Instant createdAt;
@@ -45,13 +41,11 @@ public class Notification {
   protected Notification() {
   }
 
-  public Notification(NotificationType type, String recipient, String message, int dispatchCount, Instant now) {
+  public Notification(NotificationType type, String recipient, String message, Instant now) {
     this.type = type;
     this.recipient = recipient;
     this.message = message;
     this.status = NotificationStatus.PENDING;
-    this.dispatchCount = dispatchCount;
-    this.blocked = "N";
     this.detail = "START";
     this.createdAt = now;
     this.updatedAt = this.createdAt;
@@ -100,14 +94,6 @@ public class Notification {
 
   public NotificationStatus getStatus() {
     return status;
-  }
-
-  public int getDispatchCount() {
-    return dispatchCount;
-  }
-
-  public String getBlocked() {
-    return blocked;
   }
 
   public String getDetail() {

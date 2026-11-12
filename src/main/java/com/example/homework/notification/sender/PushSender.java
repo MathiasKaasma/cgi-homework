@@ -13,12 +13,12 @@ public class PushSender implements NotificationSender {
   }
 
   @Override
-  public void send(String target, String payload) {
-    System.out.println("[PUSH] " + target + " -> " + payload);
+  public void send(String recipient, String message) {
+    System.out.println("[PUSH] " + recipient + " -> " + message);
   }
 
   @Override
-  public boolean isValidRecipient(String target) {
-    return !target.isBlank();
+  public boolean isValidRecipient(String recipient) {
+    return !recipient.isBlank();
   }
 }

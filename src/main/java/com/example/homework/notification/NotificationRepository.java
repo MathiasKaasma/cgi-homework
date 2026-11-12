@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
@@ -16,9 +15,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
   long countByRecipientAndStatusInAndCreatedAtGreaterThanEqual(
       String recipient, Collection<NotificationStatus> statuses, Instant since);
-
-  @Query("select coalesce(max(n.dispatchCount), 0) from Notification n")
-  int findMaxDispatchCount();
 
   List<Notification> findTop3ByTypeAndStatusInOrderByIdDesc(NotificationType type, Collection<NotificationStatus> statuses);
 }

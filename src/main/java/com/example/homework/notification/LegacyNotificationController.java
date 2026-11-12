@@ -20,8 +20,8 @@ public class LegacyNotificationController {
 
   @RequestMapping(value = "/send", method = RequestMethod.POST)
   @ResponseBody
-  public LegacyNotificationResponse send(@RequestBody LegacyNotificationRequest request) throws Exception {
-    return engine.processNotification(request.type(), request.target(), request.payload());
+  public LegacyNotificationResponse send(@RequestBody LegacyNotificationRequest request) {
+    return engine.processNotification(request.type(), request.recipient(), request.message());
   }
 
   @RequestMapping(value = "/history", method = RequestMethod.GET)

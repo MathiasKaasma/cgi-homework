@@ -39,8 +39,8 @@ class LegacyNotificationEngineIntegrationTest {
       "SMS,   +37255512345",
       "PUSH,  device-token-abc123"
   })
-  void supportedTypeSuccessIsStoredAsSent(NotificationType type, String target) throws Exception {
-    LegacyNotificationResponse response = engine.processNotification(type, target, "hello");
+  void supportedTypeSuccessIsStoredAsSent(NotificationType type, String recipient) {
+    LegacyNotificationResponse response = engine.processNotification(type, recipient, "hello");
 
     assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
     assertThat(response.type()).isEqualTo(type);
@@ -48,7 +48,7 @@ class LegacyNotificationEngineIntegrationTest {
   }
 
   @Test
-  void fourthAttemptToSameRecipientWithinAMinuteIsRateLimited() throws Exception {
+  void fourthAttemptToSameRecipientWithinAMinuteIsRateLimited() {
     for (int i = 0; i < 3; i++) {
       engine.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello");
     }
@@ -62,7 +62,7 @@ class LegacyNotificationEngineIntegrationTest {
   }
 
   @Test
-  void rejectedAttemptsDoNotCountTowardsRateLimit() throws Exception {
+  void rejectedAttemptsDoNotCountTowardsRateLimit() {
     failEmailThreeTimes();
     for (int i = 0; i < 3; i++) {
       assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "busy-user@example.com", "hello"))
@@ -84,11 +84,11 @@ class LegacyNotificationEngineIntegrationTest {
 
     LegacyNotificationResponse latest = engine.getLatestState();
     assertThat(latest.status()).isEqualTo(NotificationStatus.REJECTED);
-    assertThat(latest.message()).isEqualTo("Recipient 'blocked-user@example.com' is blacklisted");
+    assertThat(latest.detail()).isEqualTo("Recipient 'blocked-user@example.com' is blacklisted");
   }
 
   @Test
-  void threeFailuresOpenCircuitOnlyForThatChannel() throws Exception {
+  void threeFailuresOpenCircuitOnlyForThatChannel() {
     failEmailThreeTimes();
 
     assertThatThrownBy(() -> engine.processNotification(NotificationType.EMAIL, "next@example.com", "hello"))
@@ -100,7 +100,7 @@ class LegacyNotificationEngineIntegrationTest {
   }
 
   @Test
-  void circuitClosesAfterCooldown() throws Exception {
+  void circuitClosesAfterCooldown() {
     failEmailThreeTimes();
     doCallRealMethod().when(emailSender).send(any(), any());
     doReturn(Instant.now().plusSeconds(31)).when(clock).instant();
@@ -127,8 +127,8 @@ class LegacyNotificationEngineIntegrationTest {
       "SMS,   +5555broken-sms",
       "PUSH,  "
   })
-  void invalidTargetThrowsInvalidRecipientException(NotificationType type, String target) {
-    assertThatThrownBy(() -> engine.processNotification(type, target, "hello"))
+  void invalidRecipientIsRejectedAndNotStored(NotificationType type, String recipient) {
+    assertThatThrownBy(() -> engine.processNotification(type, recipient, "hello"))
         .isInstanceOf(InvalidRecipientException.class);
 
     assertThat(engine.getHistory()).isEmpty();

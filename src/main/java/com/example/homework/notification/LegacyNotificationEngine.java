@@ -36,22 +36,19 @@ public class LegacyNotificationEngine {
         .collect(Collectors.toMap(NotificationSender::type, Function.identity()));
   }
 
-  public synchronized LegacyNotificationResponse processNotification(NotificationType type, String target, String payload)
-      throws Exception {
-
+  public LegacyNotificationResponse processNotification(NotificationType type, String rawRecipient, String rawMessage) {
     Instant now = clock.instant();
-    String safeTarget = target != null ? target.trim() : null;
-    String safePayload = payload != null ? payload : "";
+    String recipient = rawRecipient == null ? "" : rawRecipient.trim();
+    String message = rawMessage == null ? "" : rawMessage;
     NotificationSender sender = sendersByType.get(type);
 
-    if (safeTarget == null || safeTarget.isEmpty() || !sender.isValidRecipient(safeTarget)) {
-      throw new InvalidRecipientException(type, safeTarget);
+    if (recipient.isEmpty() || !sender.isValidRecipient(recipient)) {
+      throw new InvalidRecipientException(type, recipient);
     }
 
-    int dispatchCount = repository.findMaxDispatchCount() + 1;
-    Notification notification = new Notification(type, safeTarget, safePayload, dispatchCount, now);
+    Notification notification = new Notification(type, recipient, message, now);
 
-    Optional<RuntimeException> rejection = checkSafeguards(type, safeTarget, now);
+    Optional<RuntimeException> rejection = checkSafeguards(type, recipient, now);
     if (rejection.isPresent()) {
       notification.markRejected(rejection.get().getMessage(), now);
       repository.save(notification);
@@ -61,10 +58,10 @@ public class LegacyNotificationEngine {
     repository.save(notification);
 
     try {
-      sender.send(safeTarget, safePayload);
+      sender.send(recipient, message);
       notification.markSent(clock.instant());
       return LegacyNotificationResponse.from(repository.save(notification));
-    } catch (Exception e) {
+    } catch (RuntimeException e) {
       notification.markFailed(e.getMessage(), clock.instant());
       repository.save(notification);
       throw e;

@@ -1,4 +1,4 @@
 package com.example.homework.notification;
 
-public record LegacyNotificationRequest(NotificationType type, String target, String payload) {
+public record LegacyNotificationRequest(NotificationType type, String recipient, String message) {
 }
