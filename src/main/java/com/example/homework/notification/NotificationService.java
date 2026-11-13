@@ -49,37 +49,26 @@ public class NotificationService {
   }
 
   public NotificationResponse send(NotificationType type, String rawRecipient, String rawMessage) {
-    Instant now = clock.instant();
     String recipient = rawRecipient == null ? "" : rawRecipient.trim();
     String message = rawMessage == null ? "" : rawMessage;
-    NotificationSender sender = sendersByType.get(type);
+    validateRecipient(type, recipient);
 
-    if (recipient.isEmpty() || !sender.isValidRecipient(recipient)) {
-      throw new InvalidRecipientException(type, recipient);
+    return dispatch(new Notification(type, recipient, message, clock.instant()));
+  }
+
+  public NotificationResponse update(long id, String rawRecipient, String rawMessage) {
+    Notification notification = repository.findById(id)
+        .orElseThrow(() -> new NotificationNotFoundException(id));
+    if (!notification.canBeRetried()) {
+      throw new NotificationNotUpdatableException(id, notification.getStatus());
     }
 
-    Notification notification = new Notification(type, recipient, message, now);
+    String recipient = rawRecipient == null ? notification.getRecipient() : rawRecipient.trim();
+    String message = rawMessage == null ? notification.getMessage() : rawMessage;
+    validateRecipient(notification.getType(), recipient);
 
-    Optional<RuntimeException> rejection = checkSafeguards(type, recipient, now);
-    if (rejection.isPresent()) {
-      log.info("Rejected {} notification: {}", type, rejection.get().getMessage());
-      notification.markRejected(rejection.get().getMessage(), now);
-      repository.save(notification);
-      throw rejection.get();
-    }
-
-    repository.save(notification);
-
-    try {
-      sender.send(recipient, message);
-      notification.markSent(clock.instant());
-      return NotificationResponse.from(repository.save(notification));
-    } catch (RuntimeException e) {
-      log.warn("{} delivery to {} failed", type, recipient, e);
-      notification.markFailed(e.getMessage(), clock.instant());
-      repository.save(notification);
-      throw new ChannelDeliveryException(type, e);
-    }
+    notification.retryWith(recipient, message, clock.instant());
+    return dispatch(notification);
   }
 
   public List<NotificationResponse> getNotifications() {
@@ -92,6 +81,39 @@ public class NotificationService {
     return repository.findById(id)
         .map(NotificationResponse::from)
         .orElseThrow(() -> new NotificationNotFoundException(id));
+  }
+
+  private void validateRecipient(NotificationType type, String recipient) {
+    if (recipient.isEmpty() || !sendersByType.get(type).isValidRecipient(recipient)) {
+      throw new InvalidRecipientException(type, recipient);
+    }
+  }
+
+  private NotificationResponse dispatch(Notification notification) {
+    NotificationType type = notification.getType();
+    String recipient = notification.getRecipient();
+    Instant now = notification.getUpdatedAt();
+
+    Optional<RuntimeException> rejection = checkSafeguards(type, recipient, now);
+    if (rejection.isPresent()) {
+      log.info("Rejected {} notification: {}", type, rejection.get().getMessage());
+      notification.markRejected(rejection.get().getMessage(), now);
+      repository.save(notification);
+      throw rejection.get();
+    }
+
+    repository.save(notification);
+
+    try {
+      sendersByType.get(type).send(recipient, notification.getMessage());
+      notification.markSent(clock.instant());
+      return NotificationResponse.from(repository.save(notification));
+    } catch (RuntimeException e) {
+      log.warn("{} delivery to {} failed", type, recipient, e);
+      notification.markFailed(e.getMessage(), clock.instant());
+      repository.save(notification);
+      throw new ChannelDeliveryException(type, e);
+    }
   }
 
   private Optional<RuntimeException> checkSafeguards(NotificationType type, String recipient, Instant now) {
@@ -108,13 +130,13 @@ public class NotificationService {
   }
 
   private boolean isRateLimited(String recipient, Instant now) {
-    long recentAttempts = repository.countByRecipientAndStatusInAndCreatedAtGreaterThanEqual(
+    long recentAttempts = repository.countByRecipientAndStatusInAndUpdatedAtGreaterThanEqual(
         recipient, ATTEMPT_STATUSES, now.minus(RATE_LIMIT_WINDOW));
     return recentAttempts >= RATE_LIMIT;
   }
 
   private boolean isCircuitOpen(NotificationType type, Instant now) {
-    List<Notification> lastAttempts = repository.findTop3ByTypeAndStatusInOrderByIdDesc(type, ATTEMPT_STATUSES);
+    List<Notification> lastAttempts = repository.findTop3ByTypeAndStatusInOrderByUpdatedAtDesc(type, ATTEMPT_STATUSES);
 
     if (lastAttempts.size() < CIRCUIT_FAILURE_THRESHOLD) {
       return false;

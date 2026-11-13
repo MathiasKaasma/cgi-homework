@@ -68,6 +68,18 @@ public class Notification {
     this.updatedAt = now;
   }
 
+  public boolean canBeRetried() {
+    return status == NotificationStatus.FAILED || status == NotificationStatus.REJECTED;
+  }
+
+  public void retryWith(String recipient, String message, Instant now) {
+    this.recipient = recipient;
+    this.message = message;
+    this.status = NotificationStatus.PENDING;
+    this.detail = null;
+    this.updatedAt = now;
+  }
+
   private static String truncate(String value) {
     if (value == null || value.length() <= MAX_DETAIL_LENGTH) {
       return value;

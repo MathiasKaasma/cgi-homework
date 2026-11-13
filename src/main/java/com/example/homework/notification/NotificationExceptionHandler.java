@@ -29,6 +29,11 @@ public class NotificationExceptionHandler {
     return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
   }
 
+  @ExceptionHandler(NotificationNotUpdatableException.class)
+  public ProblemDetail handleNotUpdatable(NotificationNotUpdatableException e) {
+    return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+  }
+
   @ExceptionHandler(RateLimitExceededException.class)
   public ProblemDetail handleRateLimited(RateLimitExceededException e) {
     return ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());

@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -91,6 +92,35 @@ class NotificationControllerTest {
 
     mockMvc.perform(get("/api/notifications/999"))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void updateReturnsUpdatedNotification() throws Exception {
+    Instant now = Instant.parse("2026-01-01T00:00:00Z");
+    NotificationResponse resent = new NotificationResponse(
+        5, NotificationType.EMAIL, "fixed@b.com", "hi", NotificationStatus.SENT, null, now, now);
+    when(service.update(5, "fixed@b.com", null)).thenReturn(resent);
+
+    mockMvc.perform(patch("/api/notifications/5")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"recipient": "fixed@b.com"}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.recipient").value("fixed@b.com"));
+  }
+
+  @Test
+  void updatingSentNotificationIsConflict() throws Exception {
+    when(service.update(5, "fixed@b.com", null))
+        .thenThrow(new NotificationNotUpdatableException(5, NotificationStatus.SENT));
+
+    mockMvc.perform(patch("/api/notifications/5")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"recipient": "fixed@b.com"}
+                """))
+        .andExpect(status().isConflict());
   }
 
   private ResultActions postNotification(String body) throws Exception {

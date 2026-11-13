@@ -10,8 +10,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
   List<Notification> findTop20ByOrderByIdDesc();
 
-  long countByRecipientAndStatusInAndCreatedAtGreaterThanEqual(
+  long countByRecipientAndStatusInAndUpdatedAtGreaterThanEqual(
       String recipient, Collection<NotificationStatus> statuses, Instant since);
 
-  List<Notification> findTop3ByTypeAndStatusInOrderByIdDesc(NotificationType type, Collection<NotificationStatus> statuses);
+  List<Notification> findTop3ByTypeAndStatusInOrderByUpdatedAtDesc(NotificationType type, Collection<NotificationStatus> statuses);
 }

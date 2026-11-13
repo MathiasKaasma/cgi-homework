@@ -138,6 +138,56 @@ class NotificationServiceIntegrationTest {
     assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
   }
 
+  @Test
+  void failedNotificationCanBeFixedAndResent() {
+    long id = failEmailOnce("typo@example.com");
+
+    NotificationResponse response = service.update(id, "fixed@example.com", null);
+
+    assertThat(response.id()).isEqualTo(id);
+    assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
+    assertThat(response.recipient()).isEqualTo("fixed@example.com");
+    assertThat(response.message()).isEqualTo("hello");
+  }
+
+  @Test
+  void sentNotificationCannotBeUpdated() {
+    long id = service.send(NotificationType.EMAIL, "buyer@example.com", "hello").id();
+
+    assertThatThrownBy(() -> service.update(id, "other@example.com", null))
+        .isInstanceOf(NotificationNotUpdatableException.class);
+  }
+
+  @Test
+  void updateToBlacklistedRecipientIsRejected() {
+    long id = failEmailOnce("typo@example.com");
+    blacklistService.add("spam-target@example.com", null);
+
+    assertThatThrownBy(() -> service.update(id, "spam-target@example.com", null))
+        .isInstanceOf(RecipientBlacklistedException.class);
+    assertThat(service.getNotification(id).status()).isEqualTo(NotificationStatus.REJECTED);
+  }
+
+  @Test
+  void updateWithInvalidRecipientLeavesNotificationUnchanged() {
+    long id = failEmailOnce("typo@example.com");
+
+    assertThatThrownBy(() -> service.update(id, "not-an-email", null))
+        .isInstanceOf(InvalidRecipientException.class);
+
+    NotificationResponse unchanged = service.getNotification(id);
+    assertThat(unchanged.status()).isEqualTo(NotificationStatus.FAILED);
+    assertThat(unchanged.recipient()).isEqualTo("typo@example.com");
+  }
+
+  private long failEmailOnce(String recipient) {
+    doThrow(new RuntimeException("SMTP Timeout")).when(emailSender).send(any(), any());
+    assertThatThrownBy(() -> service.send(NotificationType.EMAIL, recipient, "hello"))
+        .isInstanceOf(ChannelDeliveryException.class);
+    doCallRealMethod().when(emailSender).send(any(), any());
+    return service.getNotifications().getFirst().id();
+  }
+
   private void failEmailThreeTimes() {
     doThrow(new RuntimeException("SMTP Timeout")).when(emailSender).send(any(), any());
 
