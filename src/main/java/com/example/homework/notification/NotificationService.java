@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.example.homework.blacklist.BlacklistService;
 import com.example.homework.notification.sender.NotificationSender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,10 +31,17 @@ public class NotificationService {
 
   private final NotificationRepository repository;
 
+  private final BlacklistService blacklistService;
+
   private final Clock clock;
 
-  public NotificationService(NotificationRepository repository, List<NotificationSender> senders, Clock clock) {
+  public NotificationService(
+      NotificationRepository repository,
+      BlacklistService blacklistService,
+      List<NotificationSender> senders,
+      Clock clock) {
     this.repository = repository;
+    this.blacklistService = blacklistService;
     this.clock = clock;
 
     this.sendersByType = senders.stream()
@@ -87,7 +95,7 @@ public class NotificationService {
   }
 
   private Optional<RuntimeException> checkSafeguards(NotificationType type, String recipient, Instant now) {
-    if (isBlacklisted(recipient)) {
+    if (blacklistService.isBlacklisted(recipient)) {
       return Optional.of(new RecipientBlacklistedException(recipient));
     }
     if (isRateLimited(recipient, now)) {
@@ -97,10 +105,6 @@ public class NotificationService {
       return Optional.of(new CircuitOpenException(type));
     }
     return Optional.empty();
-  }
-
-  private boolean isBlacklisted(String recipient) {
-    return recipient.toLowerCase().contains("blocked");
   }
 
   private boolean isRateLimited(String recipient, Instant now) {

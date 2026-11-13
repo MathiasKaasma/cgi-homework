@@ -18,6 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
+import com.example.homework.blacklist.BlacklistRepository;
+import com.example.homework.blacklist.BlacklistService;
 import com.example.homework.notification.sender.EmailSender;
 
 @SpringBootTest
@@ -35,9 +37,16 @@ class NotificationServiceIntegrationTest {
   @Autowired
   private NotificationRepository repository;
 
+  @Autowired
+  private BlacklistRepository blacklistRepository;
+
+  @Autowired
+  private BlacklistService blacklistService;
+
   @BeforeEach
   void clearDatabase() {
     repository.deleteAll();
+    blacklistRepository.deleteAll();
   }
 
   @ParameterizedTest
@@ -86,13 +95,24 @@ class NotificationServiceIntegrationTest {
 
   @Test
   void blacklistedRecipientIsRejectedAndStored() {
-    assertThatThrownBy(() -> service.send(NotificationType.EMAIL, "blocked-user@example.com", "hello"))
+    blacklistService.add("Spam-Target@Example.com", "asked to stop");
+
+    assertThatThrownBy(() -> service.send(NotificationType.EMAIL, "spam-target@example.com", "hello"))
         .isInstanceOf(RecipientBlacklistedException.class)
-        .hasMessage("Recipient 'blocked-user@example.com' is blacklisted");
+        .hasMessage("Recipient 'spam-target@example.com' is blacklisted");
 
     NotificationResponse latest = service.getNotifications().getFirst();
     assertThat(latest.status()).isEqualTo(NotificationStatus.REJECTED);
-    assertThat(latest.detail()).isEqualTo("Recipient 'blocked-user@example.com' is blacklisted");
+    assertThat(latest.detail()).isEqualTo("Recipient 'spam-target@example.com' is blacklisted");
+  }
+
+  @Test
+  void removedRecipientCanReceiveAgain() {
+    long id = blacklistService.add("spam-target@example.com", null).id();
+    blacklistService.remove(id);
+
+    NotificationResponse response = service.send(NotificationType.EMAIL, "spam-target@example.com", "hello");
+    assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
   }
 
   @Test
