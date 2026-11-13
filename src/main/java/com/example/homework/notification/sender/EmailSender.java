@@ -4,10 +4,14 @@ import java.util.regex.Pattern;
 
 import com.example.homework.notification.NotificationType;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
 public class EmailSender implements NotificationSender {
+
+  private static final Logger log = LoggerFactory.getLogger(EmailSender.class);
 
   private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
@@ -18,7 +22,7 @@ public class EmailSender implements NotificationSender {
 
   @Override
   public void send(String recipient, String message) {
-    System.out.println("[EMAIL] " + recipient + " -> " + message);
+    log.info("Sending {} to {} ({} chars)", type(), recipient, message.length());
   }
 
   @Override

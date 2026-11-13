@@ -10,18 +10,17 @@ import static org.mockito.Mockito.doThrow;
 import java.time.Clock;
 import java.time.Instant;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import com.example.homework.notification.sender.EmailSender;
 
 @SpringBootTest
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class NotificationServiceIntegrationTest {
 
   @Autowired
@@ -32,6 +31,14 @@ class NotificationServiceIntegrationTest {
 
   @MockitoSpyBean
   private Clock clock;
+
+  @Autowired
+  private NotificationRepository repository;
+
+  @BeforeEach
+  void clearDatabase() {
+    repository.deleteAll();
+  }
 
   @ParameterizedTest
   @CsvSource({

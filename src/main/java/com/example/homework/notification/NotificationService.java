@@ -10,10 +10,14 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.example.homework.notification.sender.NotificationSender;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class NotificationService {
+
+  private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
 
   private static final int RATE_LIMIT = 3;
   private static final Duration RATE_LIMIT_WINDOW = Duration.ofMinutes(1);
@@ -50,6 +54,7 @@ public class NotificationService {
 
     Optional<RuntimeException> rejection = checkSafeguards(type, recipient, now);
     if (rejection.isPresent()) {
+      log.info("Rejected {} notification: {}", type, rejection.get().getMessage());
       notification.markRejected(rejection.get().getMessage(), now);
       repository.save(notification);
       throw rejection.get();
@@ -62,6 +67,7 @@ public class NotificationService {
       notification.markSent(clock.instant());
       return NotificationResponse.from(repository.save(notification));
     } catch (RuntimeException e) {
+      log.warn("{} delivery to {} failed", type, recipient, e);
       notification.markFailed(e.getMessage(), clock.instant());
       repository.save(notification);
       throw new ChannelDeliveryException(type, e);

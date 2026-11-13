@@ -4,10 +4,14 @@ import java.util.regex.Pattern;
 
 import com.example.homework.notification.NotificationType;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
 public class SmsSender implements NotificationSender {
+
+  private static final Logger log = LoggerFactory.getLogger(SmsSender.class);
 
   private static final Pattern PHONE = Pattern.compile("^\\+\\d{7,15}$");
 
@@ -18,7 +22,7 @@ public class SmsSender implements NotificationSender {
 
   @Override
   public void send(String recipient, String message) {
-    System.out.println("[SMS] " + recipient + " -> " + message);
+    log.info("Sending {} to {} ({} chars)", type(), recipient, message.length());
   }
 
   @Override
